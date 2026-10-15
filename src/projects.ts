@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_PINNED_API as string;
+const API = "https://pinned-repos.joshslellis.workers.dev";
 const CACHE_KEY = "pinned-repos";
 
 interface GitHubRepo {
@@ -39,6 +39,11 @@ export async function initProjects(): Promise<void> {
 }
 
 function renderProjects(container: HTMLElement, projects: GitHubRepo[]): void {
+  if (!Array.isArray(projects)) {
+    container.innerHTML = `<p class="error">Failed to load projects (invalid data format).</p>`;
+    return;
+  }
+
   container.innerHTML = projects
     .map((repo) => {
       const tech = [repo.language, ...(repo.topics || [])]

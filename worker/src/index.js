@@ -15,20 +15,39 @@ query($login: String!) {
   }
 }`;
 
-const ALLOWED_ORIGINS = ["http://joshuae.dev", "http://localhost:5173"];
+const ALLOWED_ORIGINS = [
+  "https://joshuae.dev",
+  "http://joshuae.dev",
+  "http://localhost:4173",
+  "http://localhost:5173",
+  "http://127.0.0.1:4173",
+  "http://127.0.0.1:5173",
+];
 
 export default {
   async fetch(request, env, ctx) {
-    const origin = request.headers.get("Origin") ?? "";
-    const cors = {
-      "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin)
-        ? origin
-        : ALLOWED_ORIGINS[0],
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
+    const origin = request.headers.get("Origin");
+    const allowedOrigin = ALLOWED_ORIGINS.includes(origin)
+      ? origin
+      : "https://joshuae.dev";
+
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": allowedOrigin,
+      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
       Vary: "Origin",
     };
-    if (request.method === "OPTIONS")
-      return new Response(null, { headers: cors });
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    if (!env.GITHUB_TOKEN) {
+      return new Response("Missing GITHUB_TOKEN", {
+        status: 500,
+        headers: corsHeaders,
+      });
+    }
 
     const cache = caches.default;
     const key = new Request(new URL(request.url).origin + "/pinned-cache-key");
@@ -47,16 +66,21 @@ export default {
           variables: { login: "JoshuaSLE" },
         }),
       });
-      if (!gh.ok)
-        return new Response("Upstream error", { status: 502, headers: cors });
+      if (!gh.ok) {
+        return new Response(`Upstream error ${gh.status}`, {
+          status: 502,
+          headers: corsHeaders,
+        });
+      }
 
       const json = await gh.json();
       const nodes = json?.data?.user?.pinnedItems?.nodes;
-      if (!nodes)
+      if (!nodes) {
         return new Response("Bad upstream data", {
           status: 502,
-          headers: cors,
+          headers: corsHeaders,
         });
+      }
 
       const repos = nodes.map((n) => ({
         name: n.name,
@@ -76,7 +100,7 @@ export default {
     }
 
     const headers = new Headers(hit.headers);
-    for (const [k, v] of Object.entries(cors)) headers.set(k, v);
-    return new Response(hit.body, { headers });
+    for (const [k, v] of Object.entries(corsHeaders)) headers.set(k, v);
+    return new Response(hit.body, { status: 200, headers });
   },
 };
