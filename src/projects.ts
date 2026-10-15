@@ -1,7 +1,7 @@
 const API = "https://pinned-repos.joshslellis.workers.dev";
 const CACHE_KEY = "pinned-repos";
 
-interface GitHubRepo {
+interface Project {
   name: string;
   description: string | null;
   html_url: string;
@@ -17,7 +17,7 @@ export async function initProjects(): Promise<void> {
   try {
     const cached = sessionStorage.getItem(CACHE_KEY);
     if (cached) {
-      renderProjects(grid, JSON.parse(cached) as GitHubRepo[]);
+      renderProjects(grid, JSON.parse(cached) as Project[]);
       return;
     }
   } catch {}
@@ -27,7 +27,7 @@ export async function initProjects(): Promise<void> {
   try {
     const res = await fetch(API);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const projects = (await res.json()) as GitHubRepo[];
+    const projects = (await res.json()) as Project[];
     try {
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(projects));
     } catch {}
@@ -38,7 +38,15 @@ export async function initProjects(): Promise<void> {
   }
 }
 
-function renderProjects(container: HTMLElement, projects: GitHubRepo[]): void {
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderProjects(container: HTMLElement, projects: Project[]): void {
   if (!Array.isArray(projects)) {
     container.innerHTML = `<p class="error">Failed to load projects (invalid data format).</p>`;
     return;
@@ -51,9 +59,9 @@ function renderProjects(container: HTMLElement, projects: GitHubRepo[]): void {
         .join(" • ");
       return `
         <article class="project-card">
-          <h3>${repo.name}</h3>
-          <p class="project-tech">${tech || "GitHub"}</p>
-          <p class="project-description">${repo.description || ""}</p>
+          <h3>${escapeHtml(repo.name)}</h3>
+          <p class="project-tech">${escapeHtml(tech || "GitHub")}</p>
+          <p class="project-description">${escapeHtml(repo.description || "")}</p>
           <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="project-link">
             View on GitHub →
           </a>
