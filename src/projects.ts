@@ -1,3 +1,6 @@
+const API = import.meta.env.VITE_PINNED_API as string;
+const CACHE_KEY = "pinned-repos";
+
 interface GitHubRepo {
   name: string;
   description: string | null;
@@ -6,28 +9,28 @@ interface GitHubRepo {
   topics: string[];
 }
 
-const REPOS: string[] = [
-  "JoshuaSLE/vulkan-engine",
-  "JoshuaSLE/chat-app",
-  "JoshuaSLE/esp32c6-zb-env-node",
-  "JoshuaSLE/stm32g-music-player",
-];
-
 export async function initProjects(): Promise<void> {
   const grid = document.getElementById("projects-grid");
   if (!grid) return;
 
-  // Show a loading state immediately while page renders
+  // Same tab/session (reloads): reuse. New open: sessionStorage is empty, so refetch.
+  try {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (cached) {
+      renderProjects(grid, JSON.parse(cached) as GitHubRepo[]);
+      return;
+    }
+  } catch {}
+
   grid.innerHTML = `<p class="loading">Loading projects from GitHub...</p>`;
 
   try {
-    const fetchPromises = REPOS.map(async (repo) => {
-      const res = await fetch(`https://api.github.com/repos/${repo}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return (await res.json()) as GitHubRepo;
-    });
-
-    const projects = await Promise.all(fetchPromises);
+    const res = await fetch(API);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const projects = (await res.json()) as GitHubRepo[];
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(projects));
+    } catch {}
     renderProjects(grid, projects);
   } catch (err) {
     console.error(err);
